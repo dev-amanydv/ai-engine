@@ -7,8 +7,6 @@ transformers
 accelerate
 Pillow
 onnxruntime
-
-Pinned versions to fix compatibility issues
 rembg==2.0.50
 numba==0.57.1
 pymatting==1.1.8
