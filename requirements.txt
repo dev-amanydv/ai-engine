@@ -8,5 +8,5 @@ accelerate
 Pillow
 onnxruntime
 rembg==2.0.50
-numba==0.57.1
+numba==0.56.4
 pymatting==1.1.8
