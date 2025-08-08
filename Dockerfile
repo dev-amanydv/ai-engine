@@ -1,7 +1,7 @@
-ENV NUMBA_DISABLE_CACHE=1
-
 # Start from an official Python base image.
 FROM python:3.9
+
+ENV NUMBA_DISABLE_CACHE=1
 
 # Set the working directory inside the container.
 WORKDIR /code
