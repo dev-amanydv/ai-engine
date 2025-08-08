@@ -1,10 +1,10 @@
 # --- Import necessary libraries ---
+import os
+os.environ["NUMBA_DISABLE_CACHE"] = "1"  # must be BEFORE any numba/rembg import
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
 from diffusers import AutoPipelineForText2Image
 import torch
-import os
-os.environ["NUMBA_DISABLE_CACHE"] = "1"
 from rembg import remove
 from PIL import Image
 import io
