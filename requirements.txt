@@ -5,5 +5,8 @@ torch
 diffusers
 transformers
 accelerate
-rembg
 Pillow
+onnxruntime
+rembg
+numba
+pymatting
