@@ -1,6 +1,4 @@
 # --- Import necessary libraries ---
-import os
-os.environ["NUMBA_DISABLE_CACHE"] = "1"  # must be BEFORE any numba/rembg import
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
 from diffusers import AutoPipelineForText2Image
@@ -8,6 +6,12 @@ import torch
 from rembg import remove
 from PIL import Image
 import io
+# --- Import Pydantic to define request body ---
+from pydantic import BaseModel
+
+# --- Define the shape of our request body ---
+class ImageRequest(BaseModel):
+    prompt: str
 
 # --- App Setup ---
 app = FastAPI()
@@ -34,12 +38,16 @@ except Exception as e:
 def read_root():
     return {"status": "AI Engine is running"}
 
+# --- THE FIX IS HERE ---
+# We change the function signature to expect an `ImageRequest` object from the body.
 @app.post("/generate-image")
-async def generate_image(prompt: str):
+async def generate_image(request: ImageRequest):
     if not pipe:
         raise HTTPException(status_code=500, detail="AI model is not available.")
     try:
-        image = pipe(prompt=prompt, num_inference_steps=2, guidance_scale=0.0).images[0]
+        # We now access the prompt via `request.prompt`
+        image = pipe(prompt=request.prompt, num_inference_steps=2, guidance_scale=0.0).images[0]
+        
         buf = io.BytesIO()
         image.save(buf, format='PNG')
         buf.seek(0)
