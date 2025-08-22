@@ -6,7 +6,6 @@ import torch
 from rembg import remove
 from PIL import Image
 import io
-# --- Import Pydantic to define request body ---
 from pydantic import BaseModel
 
 # --- Define the shape of our request body ---
@@ -18,11 +17,16 @@ app = FastAPI()
 
 # --- Model Loading ---
 device = "cuda" if torch.cuda.is_available() else "cpu"
-torch_dtype = torch.float16 if device == "cuda" else torch.bfloat16
+# Use float32 for CPU, as bfloat16 can be less stable on some hardware
+torch_dtype = torch.float16 if device == "cuda" else torch.float32
 
+pipe = None
 try:
+    print("Attempting to load AI model...")
+    # --- THE FIX IS HERE ---
+    # Switched to a more stable base model
     pipe = AutoPipelineForText2Image.from_pretrained(
-        "stabilityai/sdxl-turbo",
+        "stabilityai/stable-diffusion-xl-base-1.0",
         torch_dtype=torch_dtype,
         variant="fp16" if device == "cuda" else "fp32"
     )
@@ -30,7 +34,7 @@ try:
     print("AI model loaded successfully.")
 except Exception as e:
     print(f"Error loading AI model: {e}")
-    pipe = None
+    pipe = None # Ensure pipe is None if loading fails
 
 # --- API Endpoints ---
 
@@ -38,15 +42,13 @@ except Exception as e:
 def read_root():
     return {"status": "AI Engine is running"}
 
-# --- THE FIX IS HERE ---
-# We change the function signature to expect an `ImageRequest` object from the body.
 @app.post("/generate-image")
 async def generate_image(request: ImageRequest):
     if not pipe:
-        raise HTTPException(status_code=500, detail="AI model is not available.")
+        raise HTTPException(status_code=500, detail="AI model is not available. It may have failed to load on startup.")
     try:
-        # We now access the prompt via `request.prompt`
-        image = pipe(prompt=request.prompt, num_inference_steps=2, guidance_scale=0.0).images[0]
+        # This model works better with more inference steps
+        image = pipe(prompt=request.prompt, num_inference_steps=20, guidance_scale=7.5).images[0]
         
         buf = io.BytesIO()
         image.save(buf, format='PNG')
