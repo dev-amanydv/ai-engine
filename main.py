@@ -7,6 +7,12 @@ from rembg import remove
 from PIL import Image
 import io
 from pydantic import BaseModel
+import os
+
+# --- Hugging Face Authentication ---
+# Make sure you set your token like this:
+# export HUGGINGFACE_TOKEN="your_token_here"
+HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
 # --- Define the shape of our request body ---
 class ImageRequest(BaseModel):
@@ -17,24 +23,25 @@ app = FastAPI()
 
 # --- Model Loading ---
 device = "cuda" if torch.cuda.is_available() else "cpu"
-# Use float32 for CPU, as bfloat16 can be less stable on some hardware
 torch_dtype = torch.float16 if device == "cuda" else torch.float32
 
 pipe = None
 try:
     print("Attempting to load AI model...")
-    # --- THE FIX IS HERE ---
-    # Switched to a more stable base model
+
     pipe = AutoPipelineForText2Image.from_pretrained(
         "stabilityai/stable-diffusion-xl-base-1.0",
         torch_dtype=torch_dtype,
-        variant="fp16" if device == "cuda" else "fp32"
+        variant="fp16" if device == "cuda" else "fp32",
+        use_auth_token=HF_TOKEN if HF_TOKEN else True  # Use token if available
     )
     pipe.to(device)
+
     print("AI model loaded successfully.")
 except Exception as e:
-    print(f"Error loading AI model: {e}")
-    pipe = None # Ensure pipe is None if loading fails
+    print(f"❌ Error loading AI model: {e}")
+    print("👉 Make sure you have run: huggingface-cli login OR set HUGGINGFACE_TOKEN env variable.")
+    pipe = None
 
 # --- API Endpoints ---
 
@@ -47,8 +54,11 @@ async def generate_image(request: ImageRequest):
     if not pipe:
         raise HTTPException(status_code=500, detail="AI model is not available. It may have failed to load on startup.")
     try:
-        # This model works better with more inference steps
-        image = pipe(prompt=request.prompt, num_inference_steps=20, guidance_scale=7.5).images[0]
+        image = pipe(
+            prompt=request.prompt,
+            num_inference_steps=20,
+            guidance_scale=7.5
+        ).images[0]
         
         buf = io.BytesIO()
         image.save(buf, format='PNG')
@@ -56,7 +66,6 @@ async def generate_image(request: ImageRequest):
         return StreamingResponse(buf, media_type="image/png")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate image: {e}")
-
 
 @app.post("/remove-background")
 async def remove_background(file: UploadFile = File(...)):
