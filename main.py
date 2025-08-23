@@ -30,10 +30,9 @@ try:
     print("Attempting to load AI model...")
 
     pipe = AutoPipelineForText2Image.from_pretrained(
-        "stabilityai/stable-diffusion-xl-base-1.0",
-        torch_dtype=torch_dtype,
-        variant="fp16" if device == "cuda" else "fp32",
-        use_auth_token=HF_TOKEN if HF_TOKEN else True  # Use token if available
+        "CompVis/stable-diffusion-v1-4", # <-- CHANGED to a much smaller model
+        torch_dtype=torch_dtype
+        # Removed variant and token args for simplicity, auth is automatic
     )
     pipe.to(device)
 
