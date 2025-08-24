@@ -10,8 +10,6 @@ from pydantic import BaseModel
 import os
 
 # --- Hugging Face Authentication ---
-# Make sure you set your token like this:
-# export HUGGINGFACE_TOKEN="your_token_here"
 HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
 # --- Define the shape of our request body ---
@@ -22,24 +20,33 @@ class ImageRequest(BaseModel):
 app = FastAPI()
 
 # --- Model Loading ---
-device = "cuda" if torch.cuda.is_available() else "cpu"
-torch_dtype = torch.float16 if device == "cuda" else torch.float32
+# Optimized device detection for Mac (MPS), CUDA, and CPU
+if torch.backends.mps.is_available():
+    device = "mps"
+    torch_dtype = torch.float16
+elif torch.cuda.is_available():
+    device = "cuda"
+    torch_dtype = torch.float16
+else:
+    device = "cpu"
+    torch_dtype = torch.float32
+
+print(f"✅ Using device: {device}")
 
 pipe = None
 try:
     print("Attempting to load AI model...")
 
+    # --- UPDATED TO A MUCH FASTER TURBO MODEL ---
     pipe = AutoPipelineForText2Image.from_pretrained(
-        "CompVis/stable-diffusion-v1-4", # <-- CHANGED to a much smaller model
+        "stabilityai/sd-turbo", # Changed to the faster Turbo model
         torch_dtype=torch_dtype
-        # Removed variant and token args for simplicity, auth is automatic
     )
     pipe.to(device)
 
     print("AI model loaded successfully.")
 except Exception as e:
     print(f"❌ Error loading AI model: {e}")
-    print("👉 Make sure you have run: huggingface-cli login OR set HUGGINGFACE_TOKEN env variable.")
     pipe = None
 
 # --- API Endpoints ---
@@ -53,10 +60,12 @@ async def generate_image(request: ImageRequest):
     if not pipe:
         raise HTTPException(status_code=500, detail="AI model is not available. It may have failed to load on startup.")
     try:
+        # --- UPDATED FOR THE TURBO MODEL ---
+        # Turbo models need very few steps (1-4) and no guidance scale
         image = pipe(
             prompt=request.prompt,
-            num_inference_steps=20,
-            guidance_scale=7.5
+            num_inference_steps=1,
+            guidance_scale=0.0
         ).images[0]
         
         buf = io.BytesIO()
